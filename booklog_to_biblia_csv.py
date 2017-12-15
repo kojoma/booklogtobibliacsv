@@ -21,7 +21,7 @@ def get_file_encode(file_name: str) -> str:
     try :
         detector = UniversalDetector()
 
-        with open(booklog_name, mode='rb') as f:
+        with open(file_name, mode='rb') as f:
             for binary in f:
                 detector.feed(binary)
                 if detector.done:
@@ -30,7 +30,7 @@ def get_file_encode(file_name: str) -> str:
 
         return detector.result['encoding']
     except FileNotFoundError as e:
-        print("%s file is not found!" % (booklog_name))
+        print("%s file is not found!" % (file_name))
         sys.exit()
     except csv.Error as e:
         print(e)
@@ -46,8 +46,8 @@ def load_booklog_row(row: list) -> Dict[str, str]:
         'impressions':   row[6],
         'rate':          __rate(row[4]),
         'want_read_flg': __want_read_flg(row[5]),
-        'registered_at': __datetime_to_date(row[9]),
-        'updated_at':    __datetime_to_date(row[9]),
+        'registered_at': __datetime_to_date_str(row[9]),
+        'completed_at':  __completed_at(row[9], row[10]),
     }
 
     rakuten_book = __get_rakuten_book(book['isbn13'])
@@ -55,9 +55,6 @@ def load_booklog_row(row: list) -> Dict[str, str]:
     book['book_url']      = rakuten_book['book_url']
 
     return book
-
-def __datetime_to_date(datetime_str: str) -> str:
-    return datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S').strftime('%Y/%m/%d')
 
 def __rate(rate_str: str) -> int:
     rate = 0
@@ -78,6 +75,18 @@ def __want_read_flg(read_state: str) -> int:
         want_read_flg = 0
 
     return want_read_flg
+
+def __datetime_to_date_str(datetime_str: str) -> str:
+    return datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S').strftime('%Y/%m/%d')
+
+# 読了日がなければ登録日を読了日とする
+def __completed_at(registered_at_str: str, completed_at_str: str) -> str:
+    if len(completed_at_str) > 0 and completed_at_str != "0000-00-00 00:00:00":
+        datetime_str = completed_at_str
+    else:
+        datetime_str = registered_at_str
+
+    return __datetime_to_date_str(datetime_str)
 
 # 楽天ブックスの書籍検索APIを使って、書籍情報を取得する
 # APIについては https://webservice.rakuten.co.jp/api/booksbooksearch/ を参照
@@ -142,12 +151,12 @@ def main():
                     "",
                     book['publisher'],
                     book['isbn13'],
-                    book['registered_at'],
+                    book['completed_at'],
                     book['memo'],
                     book['impressions'],
                     book['thumbnail_url'],
                     book['book_url'],
-                    book['updated_at'],
+                    book['registered_at'],
                     book['want_read_flg'],
                     book['rate']
                 ))
