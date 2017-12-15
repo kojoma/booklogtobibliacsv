@@ -21,6 +21,7 @@
 - 変換後のCSVファイルをDropbox復旧機能を利用してビブリアに登録
 
 ```
+$ pip install chardet
 $ export RAKUTEN_APP_ID=XXXXXXXXX
 $ python booklog_to_biblia_csv.py <ブクログでエクスポートしたCSVファイル>
 ```
