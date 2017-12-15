@@ -21,7 +21,7 @@ def get_file_encode(file_name: str) -> str:
     try :
         detector = UniversalDetector()
 
-        with open(booklog_name, mode='rb') as f:
+        with open(file_name, mode='rb') as f:
             for binary in f:
                 detector.feed(binary)
                 if detector.done:
@@ -30,7 +30,7 @@ def get_file_encode(file_name: str) -> str:
 
         return detector.result['encoding']
     except FileNotFoundError as e:
-        print("%s file is not found!" % (booklog_name))
+        print("%s file is not found!" % (file_name))
         sys.exit()
     except csv.Error as e:
         print(e)
