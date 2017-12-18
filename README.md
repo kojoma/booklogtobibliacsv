@@ -27,3 +27,8 @@ $ pip install lxml
 $ export RAKUTEN_APP_ID=XXXXXXXXX
 $ python booklog_to_biblia_csv.py <ブクログでエクスポートしたCSVファイル>
 ```
+
+## 注意が必要なこと
+
+楽天ブックスAPIで書籍情報を取得できなかった場合はWEBサイトをスクレイピングします。
+短期間に大量にアクセスしないよう1秒のスリープを設けていますが、注意して使用してください。
