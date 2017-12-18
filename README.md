@@ -22,6 +22,8 @@
 
 ```
 $ pip install chardet
+$ pip install beautifulsoup4
+$ pip install lxml
 $ export RAKUTEN_APP_ID=XXXXXXXXX
 $ python booklog_to_biblia_csv.py <ブクログでエクスポートしたCSVファイル>
 ```
