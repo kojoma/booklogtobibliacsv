@@ -10,12 +10,14 @@ from datetime import datetime
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 from chardet.universaldetector import UniversalDetector
+from bs4 import BeautifulSoup
 
 from typing import Dict
 
 WANT_READ_STATE = ["読みたい", "積読"]
 RAKUTEN_BOOKS_API_URL = "https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404"
 RAKUTEN_APP_ID = os.environ['RAKUTEN_APP_ID'] if "RAKUTEN_APP_ID" in os.environ else ""
+RAKUTEN_BOOKS_WEB_URL = "https://books.rakuten.co.jp/search/dt?g=001&v=2&s=1&b=2"
 
 def get_file_encode(file_name: str) -> str:
     try :
@@ -50,7 +52,7 @@ def load_booklog_row(row: list) -> Dict[str, str]:
         'completed_at':  __completed_at(row[9], row[10]),
     }
 
-    rakuten_book = __get_rakuten_book(book['isbn13'])
+    rakuten_book = __get_book_from_api(book['isbn13'])
     book['thumbnail_url'] = rakuten_book['thumbnail_url']
     book['book_url']      = rakuten_book['book_url']
 
@@ -88,9 +90,12 @@ def __completed_at(registered_at_str: str, completed_at_str: str) -> str:
 
     return __datetime_to_date_str(datetime_str)
 
-# 楽天ブックスの書籍検索APIを使って、書籍情報を取得する
-# APIについては https://webservice.rakuten.co.jp/api/booksbooksearch/ を参照
-def __get_rakuten_book(isbn: str) -> Dict[str, str]:
+# 楽天ブックスから書籍情報を取得する
+# まず、楽天ブックスの書籍検索APIを使って、書籍情報を取得する
+#   APIについては https://webservice.rakuten.co.jp/api/booksbooksearch/ を参照
+# 楽天ブックスには登録されているが書籍検索APIで取得できない書籍が存在するため、APIで取得できなかった場合はWEBページをスクレイピングする
+# APIで取得できない理由は不明
+def __get_book_from_api(isbn: str) -> Dict[str, str]:
     rakuten_book = {
         'thumbnail_url': "",
         "book_url": ""
@@ -108,15 +113,61 @@ def __get_rakuten_book(isbn: str) -> Dict[str, str]:
 
                 if content['count'] > 0:
                     item = content['Items'][0]['Item']
-
                     rakuten_book['thumbnail_url'] = item['largeImageUrl']
                     rakuten_book['book_url']      = item['itemUrl']
+                else:
+                    rakuten_book = __get_book_from_web(isbn)
+
         except HTTPError as e:
             print("rakuten api request failed. isbn: %s, reason: %d %s" % (isbn, e.code, e.reason))
         except URLError as e:
             print("rakuten api connection failed. isbn: %s, reason: %s" % (isbn, e.reason))
 
     return rakuten_book
+
+def __get_book_from_web(isbn: str) -> Dict[str, str]:
+    rakuten_book = {
+        'thumbnail_url': "",
+        "book_url": ""
+    }
+
+    search_url    = "%s&bisbn=%s" % (RAKUTEN_BOOKS_WEB_URL, isbn)
+    search_result = __scraping_url(search_url)
+
+    if search_result is not None:
+        items = search_result.findAll('div', class_='rbcomp__item-list__item__details')
+
+        if len(items) > 0:
+            # ISBNを使っての検索のため検索結果1番目の書籍を信用する
+            item = items[0]
+            book_url = item.find('div', class_='rbcomp__item-list__item__details__lead').find('h3').find('a').attrs['href']
+            rakuten_book['book_url'] = book_url
+
+            book_result = __scraping_url(book_url)
+            if book_result is not None:
+                susumeru_area = book_result.find('div', class_='susumeruArea')
+
+                if susumeru_area is not None:
+                    thumbnail_url = susumeru_area.attrs['data-image']
+                    rakuten_book['thumbnail_url'] = thumbnail_url
+
+    return rakuten_book
+
+def __scraping_url(url: str):
+    soup = None
+    request = Request(url)
+
+    try:
+        response = urlopen(request)
+
+        if response.getcode() == 200:
+            soup  = BeautifulSoup(response.read(), 'lxml')
+    except HTTPError as e:
+        print("scraping request failed. url: %s, reason: %d %s" % (url, e.code, e.reason))
+    except URLError as e:
+        print("scraping connection failed. url: %s, reason: %s" % (url, e.reason))
+
+    return soup
 
 def main():
     argvs = sys.argv
